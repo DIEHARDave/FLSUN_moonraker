@@ -97,6 +97,17 @@ if ! grep -qs archive.debian.org /etc/apt/sources.list; then
 fi
 sudo install -m 644 "${REPO_DIR}/system/99flsun-archive" /etc/apt/apt.conf.d/99flsun-archive
 
+# FLSun built its own camera libraries (v4l-utils 1.16.3-3 with a Rockchip
+# plugin) under Debian's version number. With apt working again, the update
+# manager offers Debian's build in their place; hold them so a system update
+# keeps FLSun's. Only the ones installed are held.
+V4L_PACKAGES="libv4l-0 libv4l-dev libv4l2rds0 libv4lconvert0 v4l-utils v4l-utils-dbgsym"
+installed_v4l=$(dpkg-query -W -f='${Package} ${Status}\n' $V4L_PACKAGES 2> /dev/null \
+    | awk '/ ok installed$/ {print $1}')
+if [ -n "$installed_v4l" ]; then
+    sudo apt-mark hold $installed_v4l > /dev/null
+fi
+
 compiler_works() {
     local t
     t=$(mktemp -d)

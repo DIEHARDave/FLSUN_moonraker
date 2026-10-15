@@ -54,6 +54,12 @@ Moonraker shows up in the update manager (**Machine** page in Mainsail, **Settin
 
 Klipper still shows as invalid in the update manager, as it did before: FLSun's Klipper isn't a git checkout.
 
+### System packages
+
+With apt working again, the update manager also lists **System** packages: about 170 of Debian 10's last security and bug-fix updates. **You don't need to install them.** The printer works the same either way, and nothing here or in the other FLSun plugins needs them. If you'd rather not see them, add `enable_system_updates: False` under `[update_manager]` in `moonraker.conf`.
+
+They are safe to install if you want them. They were checked against a T1 Pro: Wi-Fi, SSH, udev, systemd and GStreamer on FLSun's image are Debian's own builds. The exception is the camera libraries (`libv4l-0`, `v4l-utils` and related packages), which FLSun built itself under Debian's version number. The installer holds them (`apt-mark hold`), so a system update leaves them alone, and the update manager may keep listing three of them as available. Install the updates while the printer is idle; Wi-Fi and SSH can drop for a moment while services restart.
+
 Your print history, settings and update state carry over. Moonraker copies FLSun's database into its new format on first start; FLSun's original stays in `~/printer_data/database.flsun` for uninstalling.
 
 Known issue: Moonraker v0.11.0's `/server/notifiers/list` API fails with "JinjaTemplate is not JSON serializable" when a notifier has an `attach` option (FLSUN_notify's do). This is a bug in Moonraker itself, and it only affects that listing; sending notifications doesn't use it.
@@ -69,7 +75,7 @@ When a new Moonraker release changes its package versions, install it on a T1 Pr
 rm -rf ~/FLSUN_moonraker
 ```
 
-This puts FLSun's Moonraker, its venv and its database back. Anything Moonraker saved after the switch, such as print history and settings, is lost. Python 3.13, the compiler and the archive.debian.org apt sources stay; they don't affect FLSun's software.
+This puts FLSun's Moonraker, its venv and its database back. Anything Moonraker saved after the switch, such as print history and settings, is lost. Python 3.13, the compiler, the archive.debian.org apt sources and the camera-library holds stay; they don't affect FLSun's software.
 
 ## License
 
