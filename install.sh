@@ -42,6 +42,11 @@ DEV_PACKAGES="libssl-dev libffi-dev zlib1g-dev libsqlite3-dev libbz2-dev
     liblzma-dev libreadline-dev libncurses-dev uuid-dev libgdbm-dev
     libjpeg62-turbo-dev libjpeg-dev libopenjp2-7-dev libfreetype6-dev
     libsodium-dev liblmdb-dev"
+# Runtime libraries the -dev packages need newer point releases of.
+RUNTIME_PACKAGES="libc6 libc-bin libssl1.1 libtinfo6 libncurses6
+    libncursesw6 libuuid1"
+# Shipped by FLSun with unmet dependencies; they block every apt install.
+BROKEN_PACKAGES="librtmp-dev libvorbis-dev"
 
 msg() { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -87,13 +92,33 @@ compiler_works() {
     return $rc
 }
 
+apt_get() {
+    sudo DEBIAN_FRONTEND=noninteractive apt-get -y -q --no-install-recommends \
+        -o Dpkg::Options::=--force-confold "$@" 2>&1 \
+        | { grep -v 'files list file for package' || true; }
+    return "${PIPESTATUS[0]}"
+}
+
 if ! compiler_works; then
     msg "Reinstalling the compiler and headers (FLSun removed them)"
     sudo apt-get update -q
+    # FLSun's image is already broken: two -dev packages it shipped are
+    # missing dependencies, which stops apt from installing anything. Their
+    # headers are gone anyway, so they're removed. The -dev packages also
+    # need the last Debian 10 point releases of the libraries FLSun froze
+    # older (libc6, libssl1.1, ncurses, libuuid1); apt upgrades those here.
+    remove=""
+    for pkg in $BROKEN_PACKAGES; do
+        dpkg -s "$pkg" > /dev/null 2>&1 && remove="$remove ${pkg}-"
+    done
     # shellcheck disable=SC2086
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --reinstall \
-        --no-install-recommends $TOOLCHAIN $DEV_PACKAGES 2>&1 \
-        | grep -v 'files list file for package' || true
+    apt_get install $RUNTIME_PACKAGES $TOOLCHAIN $DEV_PACKAGES $remove \
+        || die "apt couldn't install the build packages"
+    # Packages that were already current were skipped above, but their
+    # files are still deleted.
+    # shellcheck disable=SC2086
+    apt_get install --reinstall $TOOLCHAIN $DEV_PACKAGES \
+        || die "apt couldn't reinstall the compiler"
     compiler_works || die "the compiler still doesn't work; see the apt output above"
 fi
 

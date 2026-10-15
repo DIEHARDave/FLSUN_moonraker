@@ -9,7 +9,9 @@ Klipper and the stock screen are not touched.
 Current Moonraker needs Python 3.10 or newer. FLSun's image is Debian 10 with Python 3.7, and FLSun deleted the compiler, the C headers and most of dpkg's file lists from it. So the installer:
 
 1. **Points apt at archive.debian.org.** Debian 10 has left the regular mirrors, so FLSun's apt sources return 404. Its list is kept as `/etc/apt/sources.list.flsun`.
-2. **Reinstalls the compiler and the `-dev` packages.** They're still marked as installed, so they're reinstalled rather than installed.
+2. **Reinstalls the compiler and the `-dev` packages.** They're still marked as installed, so they're reinstalled rather than installed. To get there, apt:
+   - removes `librtmp-dev` and `libvorbis-dev`, which FLSun shipped with missing dependencies. That breakage stops apt from installing anything, and their headers were deleted anyway.
+   - updates libc6, libssl1.1, ncurses and libuuid1 to Debian 10's last security releases, which the `-dev` packages require. These are same-version patch updates; nothing else on the printer is upgraded.
 3. **Builds Python 3.13** into `/usr/local` as `python3.13`, beside the system's Python 3.7. Klipper and FLSun's software keep using 3.7.
 4. **Installs Moonraker from git** into `~/moonraker`, with a new `~/moonraker-env`. Some of its Python packages (Pillow among them) compile on the printer.
 5. **Moves FLSun's Moonraker aside.** `~/moonraker`, `~/moonraker-env` and the database are kept as `~/moonraker.flsun`, `~/moonraker-env.flsun` and `~/printer_data/database.flsun`.
