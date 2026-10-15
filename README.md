@@ -4,7 +4,7 @@ Replaces the 2023 Moonraker that FLSun ships on the **FLSun T1 Pro** with a curr
 
 Klipper and the stock screen are not touched.
 
-## Why it takes a while
+## What it does
 
 Current Moonraker needs Python 3.10 or newer. FLSun's image is Debian 10 with Python 3.7, and FLSun deleted the compiler, the C headers and most of dpkg's file lists from it. So the installer:
 
@@ -12,15 +12,17 @@ Current Moonraker needs Python 3.10 or newer. FLSun's image is Debian 10 with Py
 2. **Reinstalls the compiler and the `-dev` packages.** They're still marked as installed, so they're reinstalled rather than installed. To get there, apt:
    - removes `librtmp-dev` and `libvorbis-dev`, which FLSun shipped with missing dependencies. That breakage stops apt from installing anything, and their headers were deleted anyway.
    - updates libc6, libssl1.1, ncurses and libuuid1 to Debian 10's last security releases, which the `-dev` packages require. These are same-version patch updates; nothing else on the printer is upgraded.
-3. **Builds Python 3.13** into `/usr/local` as `python3.13`, beside the system's Python 3.7. Klipper and FLSun's software keep using 3.7.
-4. **Installs Moonraker from git** into `~/moonraker`, with a new `~/moonraker-env`. Some of its Python packages (Pillow among them) compile on the printer.
+3. **Installs Python 3.13** into `/usr/local` as `python3.13`, beside the system's Python 3.7. Klipper and FLSun's software keep using 3.7.
+4. **Installs Moonraker from git** into `~/moonraker`, with a new `~/moonraker-env`.
 5. **Moves FLSun's Moonraker aside.** `~/moonraker`, `~/moonraker-env` and the database are kept as `~/moonraker.flsun`, `~/moonraker-env.flsun` and `~/printer_data/database.flsun`.
+
+Python and Moonraker's compiled packages (Pillow among them) come prebuilt from this repo's [release](https://github.com/DIEHARDave/FLSUN_moonraker/releases/tag/prebuilt-1), built on a T1 Pro. `install.sh` checks their SHA-256 hashes before using them. If they can't be downloaded, or `FROM_SOURCE=1` is set, it builds them on the printer instead, which adds about half an hour. The compiler is reinstalled either way, so later Moonraker updates from the update manager can build newer package versions.
 
 Moonraker components that plugins link into `~/moonraker/moonraker/components` (FLSUN_Updater, FLSUN_notify and FLSUN_Timelapse do) are linked into the new Moonraker too. On first start Moonraker converts FLSun's database to its newer format, so history, settings and update state carry over.
 
 ## Install
 
-The printer must be idle. The whole install takes 45 minutes to an hour on a T1 Pro, most of it building Python, and Moonraker is down only for the last minute or so.
+The printer must be idle. The install takes about 10 minutes, or about 45 when building from source, and Moonraker is down only for the last minute or so.
 
 SSH into the printer as `pi` (the default password is `1`), then:
 
@@ -38,7 +40,7 @@ tail -f ~/printer_data/logs/flsun_moonraker.log
 
 When the log ends with `Done.`, press Ctrl+C and remove the password file with `rm ~/.pw`.
 
-The first two commands set the clock and repair certificates and git so that `git clone` works. `nohup` keeps the install going if the SSH session drops, and `tail` follows it (Ctrl+C stops following, not the install). The installer uses `sudo`, and the build outlasts sudo's 15-minute password cache, so `SUDO_ASKPASS` hands it `pi`'s password (change the `1` if you changed it). If you'd rather type it, run `~/FLSUN_moonraker/install.sh` on its own and stay connected; it asks when it needs it.
+The first two commands set the clock and repair certificates and git so that `git clone` works. `nohup` keeps the install going if the SSH session drops, and `tail` follows it (Ctrl+C stops following, not the install). The installer uses `sudo`, and a build from source outlasts sudo's 15-minute password cache, so `SUDO_ASKPASS` hands it `pi`'s password (change the `1` if you changed it). If you'd rather type it, run `~/FLSUN_moonraker/install.sh` on its own and stay connected; it asks when it needs it.
 
 The installer can be run again at any time. Finished steps, such as the Python build, are skipped, and Moonraker stays at whatever version the update manager last installed. `MOONRAKER_REF=<tag or branch>` before the command switches Moonraker to that version.
 
@@ -53,6 +55,10 @@ Klipper still shows as invalid in the update manager, as it did before: FLSun's 
 Your print history, settings and update state carry over. Moonraker copies FLSun's database into its new format on first start; FLSun's original stays in `~/printer_data/database.flsun` for uninstalling.
 
 Known issue: Moonraker v0.11.0's `/server/notifiers/list` API fails with "JinjaTemplate is not JSON serializable" when a notifier has an `attach` option (FLSUN_notify's do). This is a bug in Moonraker itself, and it only affects that listing; sending notifications doesn't use it.
+
+## Updating the prebuilt files
+
+When a new Moonraker release changes its package versions, install it on a T1 Pro with `MOONRAKER_REF=<tag> ~/FLSUN_moonraker/install.sh`, then run `~/FLSUN_moonraker/tools/build-prebuilt.sh`. It writes the Python and wheel archives to `~/prebuilt` and prints their hashes. Publish them as a new release, then update `PREBUILT_URL`, the file names and the hashes at the top of `install.sh`. Until then, installs still work: pip uses the wheels that match and builds the rest.
 
 ## Uninstall
 

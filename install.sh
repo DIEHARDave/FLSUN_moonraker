@@ -7,14 +7,26 @@
 # this:
 #   1. points apt at archive.debian.org (buster has left the mirrors),
 #   2. reinstalls the compiler and the -dev packages,
-#   3. builds Python into /usr/local (python3.13, beside the system 3.7),
+#   3. installs Python into /usr/local (python3.13, beside the system 3.7),
+#      prebuilt from this repo's release, or built from source,
 #   4. installs Moonraker from git into ~/moonraker with its own venv,
+#      using the release's prebuilt packages where the versions match,
 #   5. keeps FLSun's ~/moonraker, ~/moonraker-env and database as *.flsun
 #      so uninstall.sh can put them back.
-# Klipper is not touched. The Python build takes about half an hour.
+# Klipper is not touched. With the prebuilt files this takes about 10
+# minutes; building from source takes about 45.
 #
 # Safe to re-run: finished steps are skipped. MOONRAKER_REF=<tag or
-# branch> installs another Moonraker version.
+# branch> installs another Moonraker version. FROM_SOURCE=1 skips the
+# prebuilt files.
+
+# Built on a T1 Pro by tools/build-prebuilt.sh and published as release
+# assets; checked against these hashes before use.
+PREBUILT_URL="https://github.com/DIEHARDave/FLSUN_moonraker/releases/download/prebuilt-1"
+PREBUILT_PY="python-3.13.16-armv7l-buster.tar.xz"
+PREBUILT_PY_SHA256="90120067c15ecee3929782556b2ec61b33d5b563061dc33e9b8b01f987249b8e"
+PREBUILT_WHEELS="moonraker-v0.11.0-wheels-cp313-armv7l.tar"
+PREBUILT_WHEELS_SHA256="27bee18a64e8788dec81feee3030fc5717d6be53d5666afecc4d198bcdad4727"
 
 set -e
 # Say where an unexpected failure stopped the install.
@@ -147,8 +159,30 @@ if ! compiler_works; then
 fi
 
 # ------------------------------------------------------------- Python
-if ! "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' 2> /dev/null \
-        || [ "$("$PY_BIN" -c 'import platform; print(platform.python_version())')" != "$PY_VERSION" ]; then
+python_ok() {
+    "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' 2> /dev/null \
+        && [ "$("$PY_BIN" -c 'import platform; print(platform.python_version())')" = "$PY_VERSION" ]
+}
+
+# Downloads a release asset to $2 unless it's already there, and checks it.
+fetch_prebuilt() {
+    [ -z "$FROM_SOURCE" ] || return 1
+    mkdir -p "$BUILD_DIR"
+    if ! echo "${2}  ${BUILD_DIR}/${1}" | sha256sum -c --status 2> /dev/null; then
+        curl -fsSL --cacert "$CA_BUNDLE" -o "${BUILD_DIR}/${1}" "${PREBUILT_URL}/${1}" \
+            || { msg "Couldn't download ${1}"; return 1; }
+        echo "${2}  ${BUILD_DIR}/${1}" | sha256sum -c --status \
+            || { msg "${1} failed its checksum"; return 1; }
+    fi
+}
+
+if ! python_ok && fetch_prebuilt "$PREBUILT_PY" "$PREBUILT_PY_SHA256"; then
+    msg "Installing prebuilt Python ${PY_VERSION}"
+    sudo tar -xJf "${BUILD_DIR}/${PREBUILT_PY}" -C /
+    python_ok || msg "The prebuilt Python doesn't run here; building it instead"
+fi
+
+if ! python_ok; then
     msg "Building Python ${PY_VERSION} (about half an hour)"
     mkdir -p "$BUILD_DIR"
     tarball="${BUILD_DIR}/Python-${PY_VERSION}.tar.xz"
@@ -176,7 +210,7 @@ if ! "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' 2> /dev/n
     ) || die "the Python build failed; logs are in ${BUILD_DIR}/Python-${PY_VERSION}"
     "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' \
         || die "Python ${PY_VERSION} is missing a module; see ${BUILD_DIR}/Python-${PY_VERSION}/make.log"
-    sudo rm -rf "$BUILD_DIR"
+    sudo rm -rf "${BUILD_DIR}/Python-${PY_VERSION}"
 fi
 
 # ---------------------------------------------------------- Moonraker
@@ -212,13 +246,24 @@ if [ ! -x "${NEW_ENV}/bin/python" ] \
     rm -rf "$NEW_ENV"
     "$PY_BIN" -m venv "$NEW_ENV"
 fi
-msg "Installing Moonraker's Python packages (Pillow and others compile here)"
+# Prebuilt packages save compiling Pillow and the others. pip takes them
+# where the versions match and downloads or builds the rest.
+wheels=()
+if fetch_prebuilt "$PREBUILT_WHEELS" "$PREBUILT_WHEELS_SHA256"; then
+    rm -rf "${BUILD_DIR}/wheelhouse"
+    tar -xf "${BUILD_DIR}/${PREBUILT_WHEELS}" -C "$BUILD_DIR"
+    wheels=(--find-links "${BUILD_DIR}/wheelhouse")
+    msg "Installing Moonraker's Python packages"
+else
+    msg "Installing Moonraker's Python packages (Pillow and others compile here)"
+fi
 "${NEW_ENV}/bin/pip" install -q --upgrade pip
 # requirements.txt's --find-links is relative to the scripts folder.
-(cd "${NEW_DIR}/scripts" && "${NEW_ENV}/bin/pip" install -q -r moonraker-requirements.txt) \
+(cd "${NEW_DIR}/scripts" && "${NEW_ENV}/bin/pip" install -q "${wheels[@]}" -r moonraker-requirements.txt) \
     || die "pip failed to install Moonraker's packages"
 # Moonraker converts FLSun's LMDB database to SQLite on first start.
-"${NEW_ENV}/bin/pip" install -q lmdb || die "pip failed to install lmdb"
+"${NEW_ENV}/bin/pip" install -q "${wheels[@]}" lmdb || die "pip failed to install lmdb"
+sudo rm -rf "$BUILD_DIR"
 
 # Plugins link their Moonraker components into the components folder.
 # Carry the links over and keep git from listing them.
