@@ -17,6 +17,8 @@
 # branch> installs another Moonraker version.
 
 set -e
+# Say where an unexpected failure stopped the install.
+trap 'printf "\033[1;31mERROR:\033[0m \"%s\" failed at line %s\n" "$BASH_COMMAND" "$LINENO" >&2' ERR
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PY_VERSION="3.13.16"
@@ -155,7 +157,8 @@ if ! "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' 2> /dev/n
         echo "${PY_SHA256}  ${tarball}" | sha256sum -c --status \
             || die "Python-${PY_VERSION}.tar.xz failed its checksum"
     fi
-    rm -rf "${BUILD_DIR}/Python-${PY_VERSION}"
+    # make altinstall runs as root and leaves root-owned files here.
+    sudo rm -rf "${BUILD_DIR}/Python-${PY_VERSION}"
     tar -xJf "$tarball" -C "$BUILD_DIR"
     (
         cd "${BUILD_DIR}/Python-${PY_VERSION}"
@@ -172,7 +175,7 @@ if ! "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' 2> /dev/n
     ) || die "the Python build failed; logs are in ${BUILD_DIR}/Python-${PY_VERSION}"
     "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' \
         || die "Python ${PY_VERSION} is missing a module; see ${BUILD_DIR}/Python-${PY_VERSION}/make.log"
-    rm -rf "$BUILD_DIR"
+    sudo rm -rf "$BUILD_DIR"
 fi
 
 # ---------------------------------------------------------- Moonraker
