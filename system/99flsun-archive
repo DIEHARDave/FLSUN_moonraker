@@ -1,4 +1,4 @@
 // archive.debian.org's Release files have expired; installed by FLSUN_moonraker.
 Acquire::Check-Valid-Until "false";
-// Its CDN sometimes answers 404 for files it has; retry instead of failing.
+// Retry downloads that fail part-way.
 Acquire::Retries "5";

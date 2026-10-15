@@ -99,6 +99,21 @@ apt_get() {
     return "${PIPESTATUS[0]}"
 }
 
+# apt 1.8 sends the + in version numbers as %2b, which archive.debian.org's
+# CDN answers with 404 (%2B works). Download what apt would fetch with curl
+# into its cache first, so apt only installs.
+apt_prefetch() {
+    local url file
+    sudo apt-get -qq --print-uris --no-install-recommends install "$@" \
+        | while read -r url file _; do
+            url="${url//\'/}"
+            [ -s "/var/cache/apt/archives/${file}" ] && continue
+            url="${url//%2b/+}"
+            sudo curl -fsSL --retry 3 -o "/var/cache/apt/archives/${file}" "$url" \
+                || { echo "could not download $url" >&2; return 1; }
+        done
+}
+
 if ! compiler_works; then
     msg "Reinstalling the compiler and headers (FLSun removed them)"
     sudo apt-get update -q
@@ -112,12 +127,14 @@ if ! compiler_works; then
         dpkg -s "$pkg" > /dev/null 2>&1 && remove="$remove ${pkg}-"
     done
     # shellcheck disable=SC2086
-    apt_get install $RUNTIME_PACKAGES $TOOLCHAIN $DEV_PACKAGES $remove \
+    apt_prefetch $RUNTIME_PACKAGES $TOOLCHAIN $DEV_PACKAGES $remove \
+        && apt_get install $RUNTIME_PACKAGES $TOOLCHAIN $DEV_PACKAGES $remove \
         || die "apt couldn't install the build packages"
     # Packages that were already current were skipped above, but their
     # files are still deleted.
     # shellcheck disable=SC2086
-    apt_get install --reinstall $TOOLCHAIN $DEV_PACKAGES \
+    apt_prefetch --reinstall $TOOLCHAIN $DEV_PACKAGES \
+        && apt_get install --reinstall $TOOLCHAIN $DEV_PACKAGES \
         || die "apt couldn't reinstall the compiler"
     compiler_works || die "the compiler still doesn't work; see the apt output above"
 fi
