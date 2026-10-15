@@ -49,6 +49,13 @@ die() { printf '\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 [ "$(id -u)" -ne 0 ] || die "run as the pi user, not root (sudo is used where needed)"
 [ -d "${DATA_DIR}/config" ] || die "${DATA_DIR}/config not found"
 
+# For unattended runs: SUDO_ASKPASS=<script that prints pi's password>
+# makes every sudo here, and in prepare.sh, ask it instead of the terminal.
+if [ -n "$SUDO_ASKPASS" ]; then
+    sudo() { command sudo -A "$@"; }
+    export -f sudo
+fi
+
 print_state() {
     curl -s --max-time 5 "http://127.0.0.1:7125/printer/objects/query?print_stats=state" \
         | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["status"]["print_stats"]["state"])' \

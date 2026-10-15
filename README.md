@@ -27,11 +27,16 @@ sudo ntpdate -u -b time.google.com
 curl -fsSL --cacert /etc/ssl/certs/ca-certificates.crt https://raw.githubusercontent.com/DIEHARDave/FLSUN_moonraker/main/prepare.sh | bash
 cd ~
 git clone https://github.com/DIEHARDave/FLSUN_moonraker.git
-nohup ~/FLSUN_moonraker/install.sh > ~/printer_data/logs/flsun_moonraker.log 2>&1 &
+printf '#!/bin/sh
+echo 1
+' > ~/.pw && chmod 700 ~/.pw
+SUDO_ASKPASS=~/.pw nohup ~/FLSUN_moonraker/install.sh > ~/printer_data/logs/flsun_moonraker.log 2>&1 &
 tail -f ~/printer_data/logs/flsun_moonraker.log
 ```
 
-The first two commands set the clock and repair certificates and git so that `git clone` works. `nohup` keeps the install going if the SSH session drops, and `tail` follows it (Ctrl+C stops following, not the install). The installer asks for `pi`'s password for `sudo` at the start unless it's already cached.
+When the log ends with `Done.`, press Ctrl+C and remove the password file with `rm ~/.pw`.
+
+The first two commands set the clock and repair certificates and git so that `git clone` works. `nohup` keeps the install going if the SSH session drops, and `tail` follows it (Ctrl+C stops following, not the install). The installer uses `sudo`, and the build outlasts sudo's 15-minute password cache, so `SUDO_ASKPASS` hands it `pi`'s password (change the `1` if you changed it). If you'd rather type it, run `~/FLSUN_moonraker/install.sh` on its own and stay connected; it asks when it needs it.
 
 The installer can be run again at any time. Finished steps, such as the Python build, are skipped. `MOONRAKER_REF=<tag or branch>` before the command installs another Moonraker version.
 
