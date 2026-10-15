@@ -169,6 +169,18 @@ if ! compiler_works; then
     compiler_works || die "the compiler still doesn't work; see the apt output above"
 fi
 
+# FLSun deleted ucf's files from dpkg's database, so its debconf questions
+# aren't registered. Packages that keep config files through ucf, such as
+# openssh-server, then fail to set up ("failed to open ucf") when the
+# update manager's System updates are installed. Reinstalling ucf puts its
+# files back; it keeps every existing config file.
+if [ ! -f /var/lib/dpkg/info/ucf.templates ]; then
+    msg "Repairing ucf, which system updates need for config files"
+    sudo apt-get update -q
+    apt_prefetch --reinstall ucf && apt_get install --reinstall ucf \
+        || die "apt couldn't reinstall ucf"
+fi
+
 # ------------------------------------------------------------- Python
 python_ok() {
     "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' 2> /dev/null \

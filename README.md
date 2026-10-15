@@ -60,6 +60,8 @@ With apt working again, the update manager also lists **System** packages: about
 
 They are safe to install if you want them. They were checked against a T1 Pro: Wi-Fi, SSH, udev, systemd and GStreamer on FLSun's image are Debian's own builds. The exception is the camera libraries (`libv4l-0`, `v4l-utils` and related packages), which FLSun built itself under Debian's version number. The installer holds them (`apt-mark hold`), so a system update leaves them alone, and the update manager may keep listing three of them as available. Install the updates while the printer is idle; Wi-Fi and SSH can drop for a moment while services restart.
 
+If the update manager reports **Error updating system packages**, the packages are installed but a few weren't finished setting up. Moonraker installs system updates through PackageKit, which sometimes holds a lock that a package's setup also needs. Finish them over SSH with `sudo dpkg --configure -a`, then reboot. FLSun's image also had `ucf` broken, which stopped openssh-server from setting up; the installer repairs it.
+
 Your print history, settings and update state carry over. Moonraker copies FLSun's database into its new format on first start; FLSun's original stays in `~/printer_data/database.flsun` for uninstalling.
 
 Known issue: Moonraker v0.11.0's `/server/notifiers/list` API fails with "JinjaTemplate is not JSON serializable" when a notifier has an `attach` option (FLSUN_notify's do). This is a bug in Moonraker itself, and it only affects that listing; sending notifications doesn't use it.
