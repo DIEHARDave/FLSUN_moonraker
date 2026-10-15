@@ -100,15 +100,17 @@ apt_get() {
 }
 
 # apt 1.8 sends the + in version numbers as %2b, which archive.debian.org's
-# CDN answers with 404 (%2B works). Download what apt would fetch with curl
-# into its cache first, so apt only installs.
+# CDN answers with 404 for some files (as does a literal +; %2B always
+# works). Download what apt would fetch with curl into its cache first, so
+# apt only installs.
 apt_prefetch() {
     local url file
     sudo apt-get -qq --print-uris --no-install-recommends install "$@" \
         | while read -r url file _; do
             url="${url//\'/}"
             [ -s "/var/cache/apt/archives/${file}" ] && continue
-            url="${url//%2b/+}"
+            url="${url//%2b/%2B}"
+            url="${url//+/%2B}"
             sudo curl -fsSL --retry 3 -o "/var/cache/apt/archives/${file}" "$url" \
                 || { echo "could not download $url" >&2; return 1; }
         done
