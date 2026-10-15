@@ -99,20 +99,22 @@ apt_get() {
     return "${PIPESTATUS[0]}"
 }
 
-# apt 1.8 sends the + in version numbers as %2b, which archive.debian.org's
-# CDN answers with 404 for some files (as does a literal +; %2B always
-# works). Download what apt would fetch with curl into its cache first, so
-# apt only installs.
+# apt 1.8 sends the + in version numbers as %2b. archive.debian.org's CDN
+# stores each file under one spelling of the +, and which one varies from
+# file to file (%2B, + or %2b), so for many packages apt's request 404s.
+# Download what apt would fetch with curl into its cache first, trying
+# each spelling, so apt only installs.
 apt_prefetch() {
-    local url file
+    local url file dest spelling
     sudo apt-get -qq --print-uris --no-install-recommends install "$@" \
         | while read -r url file _; do
             url="${url//\'/}"
-            [ -s "/var/cache/apt/archives/${file}" ] && continue
-            url="${url//%2b/%2B}"
-            url="${url//+/%2B}"
-            sudo curl -fsSL --retry 3 -o "/var/cache/apt/archives/${file}" "$url" \
-                || { echo "could not download $url" >&2; return 1; }
+            dest="/var/cache/apt/archives/${file}"
+            [ -s "$dest" ] && continue
+            url="${url//%2b/+}"
+            for spelling in %2B + %2b; do
+                sudo curl -fsSL --retry 2 -o "$dest" "${url//+/$spelling}" 2> /dev/null && break
+            done || { sudo rm -f "$dest"; echo "could not download $url" >&2; return 1; }
         done
 }
 
