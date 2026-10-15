@@ -161,7 +161,11 @@ if ! "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' 2> /dev/n
         cd "${BUILD_DIR}/Python-${PY_VERSION}"
         # No --enable-optimizations: its profiling run would double the
         # build time for little gain in Moonraker.
-        ./configure --prefix=/usr/local --with-ensurepip=install > configure.log 2>&1 \
+        # /usr/local/lib has an OpenSSL 3 library (no headers) beside
+        # ffmpeg's, and its pkg-config file would link it against Debian's
+        # OpenSSL 1.1 headers; point configure at Debian's OpenSSL instead.
+        ./configure --prefix=/usr/local --with-ensurepip=install \
+            --with-openssl=/usr --with-openssl-rpath=no > configure.log 2>&1 \
             || { tail -30 configure.log; exit 1; }
         make -j"$(nproc)" > make.log 2>&1 || { tail -50 make.log; exit 1; }
         sudo make altinstall > install.log 2>&1 || { tail -30 install.log; exit 1; }
