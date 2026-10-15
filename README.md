@@ -22,7 +22,9 @@ Moonraker components that plugins link into `~/moonraker/moonraker/components` (
 
 ## Install
 
-The printer must be idle. The install takes about 10 minutes, or about 45 when building from source, and Moonraker is down only for the last minute or so.
+With [FLSUN_Updater](https://github.com/DIEHARDave/FLSUN_Updater): set `flsun_moonraker: yes` in `flsun_plugins.cfg`, or run `ENABLE_PLUGIN NAME=flsun_moonraker`. [FLSUN_klipper](https://github.com/DIEHARDave/FLSUN_klipper) needs this plugin's Python and compiler, so install this one first, or turn both on at the same time.
+
+By hand: the printer must be idle. The install takes about 10 minutes, or about 45 when building from source, and Moonraker is down only for the last minute or so.
 
 SSH into the printer as `pi` (the default password is `1`), then:
 
