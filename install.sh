@@ -11,7 +11,7 @@
 #   4. installs Moonraker from git into ~/moonraker with its own venv,
 #   5. keeps FLSun's ~/moonraker, ~/moonraker-env and database as *.flsun
 #      so uninstall.sh can put them back.
-# Klipper is not touched. The Python build takes about an hour.
+# Klipper is not touched. The Python build takes about half an hour.
 #
 # Safe to re-run: finished steps are skipped. MOONRAKER_REF=<tag or
 # branch> installs another Moonraker version.
@@ -25,6 +25,7 @@ PY_VERSION="3.13.16"
 PY_SHA256="f4b1bfb3c79b5bb11b8d228a12504163b4c0dab4d679828d8f5f26b6cb6ab35d"
 PY_BIN="/usr/local/bin/python${PY_VERSION%.*}"
 MOONRAKER_REPO="https://github.com/Arksine/moonraker.git"
+ASKED_REF="${MOONRAKER_REF:-}"
 MOONRAKER_REF="${MOONRAKER_REF:-v0.11.0}"
 MR_DIR="${HOME}/moonraker"
 MR_ENV="${HOME}/moonraker-env"
@@ -148,7 +149,7 @@ fi
 # ------------------------------------------------------------- Python
 if ! "$PY_BIN" -c 'import ssl, sqlite3, ctypes, zlib, bz2, lzma, uuid' 2> /dev/null \
         || [ "$("$PY_BIN" -c 'import platform; print(platform.python_version())')" != "$PY_VERSION" ]; then
-    msg "Building Python ${PY_VERSION} (about an hour)"
+    msg "Building Python ${PY_VERSION} (about half an hour)"
     mkdir -p "$BUILD_DIR"
     tarball="${BUILD_DIR}/Python-${PY_VERSION}.tar.xz"
     if ! echo "${PY_SHA256}  ${tarball}" | sha256sum -c --status 2> /dev/null; then
@@ -182,18 +183,28 @@ fi
 NEW_DIR="${MR_DIR}.new"
 NEW_ENV="${MR_ENV}.new"
 upstream_installed() { git -C "$MR_DIR" remote get-url origin 2> /dev/null | grep -q Arksine/moonraker; }
+# The update manager only accepts Moonraker on a branch that tracks
+# origin, not a detached tag, so master is moved to the version.
+check_out() {
+    git -C "$1" checkout -q -B master "$MOONRAKER_REF"
+    git -C "$1" branch -q --set-upstream-to=origin/master master
+}
 
 if upstream_installed; then
-    # Already switched; just bring the venv up to date.
+    # Already switched; bring the venv up to date. Leave the version to
+    # the update manager unless one was asked for.
     NEW_DIR="$MR_DIR"
     NEW_ENV="$MR_ENV"
-    git -C "$MR_DIR" fetch -q --tags origin
-    git -C "$MR_DIR" checkout -q "$MOONRAKER_REF"
+    if [ -n "$ASKED_REF" ]; then
+        msg "Switching Moonraker to ${MOONRAKER_REF}"
+        git -C "$MR_DIR" fetch -q --tags origin
+        check_out "$MR_DIR"
+    fi
 else
     msg "Downloading Moonraker ${MOONRAKER_REF}"
     rm -rf "$NEW_DIR"
     git clone -q "$MOONRAKER_REPO" "$NEW_DIR"
-    git -C "$NEW_DIR" checkout -q "$MOONRAKER_REF"
+    check_out "$NEW_DIR"
 fi
 
 if [ ! -x "${NEW_ENV}/bin/python" ] \
