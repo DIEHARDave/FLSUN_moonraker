@@ -1,5 +1,7 @@
 # FLSUN_moonraker
 
+> **Parts:** the printers, boards, readers and other gear that go with this project are listed at [projects.die-hard.net/gear](https://projects.die-hard.net/gear) (Amazon affiliate links).
+
 Replaces the 2023 Moonraker that FLSun ships on the **FLSun T1 Pro** with a current upstream release ([Moonraker v0.11.0](https://github.com/Arksine/moonraker/releases/tag/v0.11.0)), updated afterwards from Mainsail's or Fluidd's update manager like any other Moonraker.
 
 Klipper and the stock screen are not touched.
